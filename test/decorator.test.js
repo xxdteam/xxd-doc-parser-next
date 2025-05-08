@@ -20,13 +20,13 @@ describe('Decorator Parser', () => {
     assert(Array.isArray(result.modules));
     assert(result.modules.length > 0);
     
-    const testModule = result.modules.find(m => m.name.startsWith('test-'));
+    const testModule = result.modules.find(m => m.name.startsWith('test'));
     assert(testModule);
     assert.equal(testModule.path, '/test');
   });
 
   it('should parse actions with decorators', () => {
-    const testModule = result.modules.find(m => m.name.startsWith('test-'));
+    const testModule = result.modules.find(m => m.name.startsWith('test'));
     assert(testModule.actions);
     assert.equal(testModule.actions.length, 2);
 
