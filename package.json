@@ -1,0 +1,31 @@
+{
+  "name": "xxd-doc-parser-next",
+  "version": "1.0.2",
+  "description": "Enhanced XXD API documentation parser with decorator support",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "mocha test/**/*.test.js",
+    "lint": "eslint ."
+  },
+  "keywords": [
+    "xxd",
+    "api",
+    "doc",
+    "parser",
+    "decorator"
+  ],
+  "author": "XXD Team",
+  "license": "MIT",
+  "dependencies": {
+    "@babel/parser": "^7.22.7",
+    "@babel/traverse": "^7.22.8",
+    "@babel/types": "^7.22.5",
+    "globby": "^11.0.0",
+    "doctrine": "^3.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.22.1",
+    "eslint": "^8.3.0",
+    "mocha": "^10.2.0"
+  }
+}
