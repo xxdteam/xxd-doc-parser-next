@@ -1,6 +1,6 @@
 {
   "name": "xxd-doc-parser-next",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Enhanced XXD API documentation parser with decorator support",
   "main": "src/index.js",
   "scripts": {
