@@ -90,37 +90,18 @@ function parseParam(tag) {
   // Handle parameter formats consistently
   if (typeExpression) {
     const paramName = tag.name;
-
-    // Skip context parameter as it's a framework parameter
     if (paramName === 'context') {
       return null;
     }
-
-    // If it's the params object itself, keep it
     if (paramName === 'params') {
-      return {
-        type: doctrine.type.stringify(typeExpression),
-        name: paramName,
-        description: tag.description || '',
-        optional: isOptional,
-      };
+      return null;
     }
 
     // Handle params.x format - extract the actual parameter name
-    if (paramName.startsWith('params.')) {
+    if (typeExpression && paramName && tag.name.startsWith('params.')) {
       return {
         type: doctrine.type.stringify(typeExpression),
         name: paramName.slice(7), // Removes 'params.' prefix
-        description: tag.description || '',
-        optional: isOptional,
-      };
-    }
-
-    // For parameters that don't use params prefix but are not context
-    if (!paramName.startsWith('params.') && paramName !== 'context') {
-      return {
-        type: doctrine.type.stringify(typeExpression),
-        name: paramName,
         description: tag.description || '',
         optional: isOptional,
       };
