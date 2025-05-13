@@ -87,17 +87,44 @@ function parseParam(tag) {
     typeExpression = tag.type.expression; // Get the actual type from inside OptionalType
   }
 
-  // Proceed only if we have a valid type expression and the name starts with 'params.'
-  if (typeExpression && tag.name && tag.name.startsWith('params.')) {
-    const paramData = {
-      // Convert the *actual* type expression to string
-      type: doctrine.type.stringify(typeExpression),
-      name: tag.name.slice(7), // Removes 'params.' prefix
-      description: tag.description || '',
-      // Set the optional flag based on our check
-      optional: isOptional,
-    };
-    return paramData;
+  // Handle parameter formats consistently
+  if (typeExpression) {
+    const paramName = tag.name;
+
+    // Skip context parameter as it's a framework parameter
+    if (paramName === 'context') {
+      return null;
+    }
+
+    // If it's the params object itself, keep it
+    if (paramName === 'params') {
+      return {
+        type: doctrine.type.stringify(typeExpression),
+        name: paramName,
+        description: tag.description || '',
+        optional: isOptional,
+      };
+    }
+
+    // Handle params.x format - extract the actual parameter name
+    if (paramName.startsWith('params.')) {
+      return {
+        type: doctrine.type.stringify(typeExpression),
+        name: paramName.slice(7), // Removes 'params.' prefix
+        description: tag.description || '',
+        optional: isOptional,
+      };
+    }
+
+    // For parameters that don't use params prefix but are not context
+    if (!paramName.startsWith('params.') && paramName !== 'context') {
+      return {
+        type: doctrine.type.stringify(typeExpression),
+        name: paramName,
+        description: tag.description || '',
+        optional: isOptional,
+      };
+    }
   }
 
   return null;
@@ -105,18 +132,24 @@ function parseParam(tag) {
 
 function getFuncName(node) {
   let name = '';
-  
+
   if (t.isClassMethod(node)) {
     name = node.key.name;
   } else if (t.isClassProperty(node)) {
     name = node.key.name;
   } else if (t.isFunctionDeclaration(node)) {
     name = node.id.name;
-  } else if (t.isVariableDeclarator(node) && 
+  } else if (t.isVariableDeclarator(node) &&
     (t.isFunctionExpression(node.init) || t.isArrowFunctionExpression(node.init))) {
     name = node.id.name;
+  } else if (t.isObjectProperty(node) && t.isIdentifier(node.key)) {
+    // For object methods in any module
+    name = node.key.name;
+  } else if (t.isObjectMethod(node)) {
+    // Handle object methods
+    name = node.key.name;
   }
-  
+
   return name;
 }
 

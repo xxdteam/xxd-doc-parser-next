@@ -12,6 +12,7 @@ function parseDirectory(path, basePath = path) {
   let application = null;
   const modules = [];
   const actions = [];
+  const fileActionMap = new Map(); // Map to track which actions belong to which file
 
   for (const file of globby.sync(`${path}/**/*.js`)) {
     const result = parseFile(file, basePath);
@@ -21,6 +22,14 @@ function parseDirectory(path, basePath = path) {
       }
       application = result.application;
     }
+
+    // Store file-actions relationship for later processing
+    const filename = _path.relative(basePath, file);
+    const basename = _path.basename(filename, _path.extname(filename));
+    if (result.actions.length > 0) {
+      fileActionMap.set(basename, result.actions);
+    }
+
     modules.push(...result.modules);
     actions.push(...result.actions);
   }
@@ -28,14 +37,39 @@ function parseDirectory(path, basePath = path) {
   if (!application) {
     throw new Error('Expect exact one application definition, but not given.');
   }
+
   application.modules = modules;
+
+  // Process module-action associations based on filename
+  processModuleActions(modules, fileActionMap);
 
   return application;
 }
 
+/**
+ * Process modules to ensure actions are properly connected regardless of directory structure
+ * @param {Array} modules - Array of modules
+ * @param {Map} fileActionMap - Map of filename to actions
+ */
+function processModuleActions(modules, fileActionMap) {
+  // Assign actions to modules by matching filename
+  for (const module of modules) {
+    const moduleActions = fileActionMap.get(module.filename) || [];
+    // Add actions to module that aren't already there
+    for (const action of moduleActions) {
+      if (!module.actions.includes(action)) {
+        // Fix path prefixing
+        if (module.path && action.route && action.route.path) {
+          action.route.path = _path.posix.join(module.path, action.route.path);
+        }
+        module.actions.push(action);
+      }
+    }
+  }
+}
+
 function parseFile(path, base) {
   const sourceCode = utils.getSourceCode(path);
-  const hashMap = {};
   const filename = _path.relative(base, path);
   const basename = _path.basename(filename, _path.extname(filename));
 
@@ -95,10 +129,12 @@ function parseFile(path, base) {
         modules.push(result);
       } else if (result.type === 'action') {
         actions.push(result);
+
+        // Try to find a module this action belongs to
         const moduleDefinition = modules.find(mod => {
           const moduleNode = resultToNode.get(mod);
           let isNested = false;
-          
+
           // 创建一个新的访问者对象来检查节点关系
           traverse(ast, {
             Program(path) {
@@ -114,19 +150,20 @@ function parseFile(path, base) {
               });
             }
           });
-          
+
           return isNested;
         });
-        
+
         if (moduleDefinition) {
           moduleDefinition.actions.push(result);
           if (moduleDefinition.path) {
-            result.route.path = _path.join(moduleDefinition.path, result.route.path);
+            result.route.path = _path.posix.join(moduleDefinition.path, result.route.path);
           }
         }
       }
     }
   }
+
   return { application, modules, actions };
 
   function parseComment(comment) {
@@ -163,7 +200,7 @@ function parseFile(path, base) {
     } else if (doc.has('route')) {
       const routes = doc.customArray('route', utils.parseRoute);
       const funcname = utils.getFuncName(commentToNode.get(comment));
-      const actionName = routes[0].toName();
+      const actionName = routes[0] && routes[0].toName();
       return routes.map(route => {
         const nameValue = actionName || (route && route.toName()) || 'action';
         return {
