@@ -213,6 +213,7 @@ function parseFile(path, base) {
           params: doc.customArray('param', utils.parseParam).filter(Boolean),
           middlewares: doc.customArray('middleware', utils.parseMiddleware).filter(Boolean),
           filename: basename,
+          returns: [...doc.customArray('return', utils.parseReturn).filter(Boolean), ...doc.customArray('returns', utils.parseReturn).filter(Boolean)],
           funcname,
         };
       });
