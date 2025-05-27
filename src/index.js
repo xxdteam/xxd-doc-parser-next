@@ -13,6 +13,7 @@ function parseDirectory(path, basePath = path) {
   const modules = [];
   const actions = [];
   const fileActionMap = new Map(); // Map to track which actions belong to which file
+  let allTypeDefinitions = {}; // <--- NEW: Initialize collection for all typedefs
 
   for (const file of globby.sync(`${path}/**/*.js`)) {
     const result = parseFile(file, basePath);
@@ -21,6 +22,11 @@ function parseDirectory(path, basePath = path) {
         throw new Error(`Expect exact one application definition, given 2 or more. (${file})`);
       }
       application = result.application;
+    }
+
+    // Merge typedefs from this file
+    if (result.typeDefinitions) { // <--- NEW: Check if typedefs were found
+      allTypeDefinitions = { ...allTypeDefinitions, ...result.typeDefinitions };
     }
 
     // Store file-actions relationship for later processing
@@ -39,6 +45,7 @@ function parseDirectory(path, basePath = path) {
   }
 
   application.modules = modules;
+  application.typeDefinitions = allTypeDefinitions; // <--- NEW: Attach all typedefs to the application object
 
   // Process module-action associations based on filename
   processModuleActions(modules, fileActionMap);
@@ -115,9 +122,19 @@ function parseFile(path, base) {
   let application = null;
   const modules = [];
   const actions = [];
+  let fileTypeDefinitions = {}; // <--- NEW: To collect typedefs for this specific file
 
   for (const comment of comments) {
-    for (const result of parseComment(comment)) {
+    const doc = utils.parseJSDoc(comment.value); // <--- Make sure doc is defined here
+
+    // --- BEGIN NEW TYPE DEFINITION EXTRACTION ---
+    const typeDefsFromFile = doc.getTypeDefinitions();
+    if (typeDefsFromFile) {
+      fileTypeDefinitions = { ...fileTypeDefinitions, ...typeDefsFromFile };
+    }
+    // --- END NEW TYPE DEFINITION EXTRACTION ---
+
+    for (const result of parseComment(comment, doc)) { // <--- Pass doc to parseComment
       const node = commentToNode.get(comment);
       resultToNode.set(result, node);
       if (result.type === 'application') {
@@ -164,10 +181,11 @@ function parseFile(path, base) {
     }
   }
 
-  return { application, modules, actions };
+  return { application, modules, actions, typeDefinitions: fileTypeDefinitions }; // <--- NEW: Return collected typedefs
 
-  function parseComment(comment) {
-    const doc = utils.parseJSDoc(comment.value);
+  function parseComment(comment, parsedJSDoc) { // <--- Modified to accept parsedJSDoc
+    // const doc = utils.parseJSDoc(comment.value); // <--- This line is now redundant if doc is passed
+    const doc = parsedJSDoc; // Use the already parsed JSDoc
     if (doc.has('application')) {
       return [
         {

@@ -11,7 +11,7 @@ function getSourceCode(filename) {
 }
 
 function parseJSDoc(commentText) {
-    const doc = doctrine.parse(commentText, {unwrap: true});
+    const doc = doctrine.parse(commentText, {unwrap: true, sloppy: true});
     return {
         title() {
             return doc.description
@@ -38,6 +38,61 @@ function parseJSDoc(commentText) {
         customArray(tagName, mapper) {
             const tags = doc.tags.filter(tag => tag.title === tagName);
             return tags.map(mapper);
+        },
+        getTypeDefinitions() {
+            const typeDefs = {};
+            const allTags = doc.tags; 
+
+            // console.log(`[TypedefDebug] Full JSDoc AST (doc object from doctrine):`, JSON.stringify(doc, null, 2));
+
+            for (const tag of allTags) {
+                if (tag.title === 'typedef' && tag.name) {
+                    let typeDescription = '';
+                    if (tag.description && tag.description.trim() !== '') {
+                        typeDescription = tag.description.trim();
+                        // console.log(`[TypedefDebug] For ${tag.name}: Used tag.description: '${typeDescription}'`);
+                    } else if (doc.description && doc.description.trim() !== '') {
+                        // Take the first significant line of the main doc.description if tag.description is empty
+                        // This often captures the summary that precedes any tags.
+                        const mainDescLines = doc.description.trim().split('\n');
+                        const firstMeaningfulLine = mainDescLines.find(line => line.trim() !== '' && !line.trim().startsWith('@'));
+                        if (firstMeaningfulLine) {
+                           typeDescription = firstMeaningfulLine.trim();
+                        //    console.log(`[TypedefDebug] For ${tag.name}: Used first line of doc.description: '${typeDescription}' (Full doc.description was: "${doc.description.trim().replace(/\n/g, '\\n')}")`);
+                        } else {
+                        //    console.log(`[TypedefDebug] For ${tag.name}: doc.description was present but no meaningful first line found without tags. (Full doc.description was: "${doc.description.trim().replace(/\n/g, '\\n')}")`);
+                        }
+                    } else {
+                        // console.log(`[TypedefDebug] For ${tag.name}: Neither tag.description nor doc.description provided a value.`);
+                    }
+
+                    typeDefs[tag.name] = {
+                        type: doctrine.type.stringify(tag.type).toLowerCase() === 'function' ? 'function' : 'object',
+                        description: typeDescription,
+                        properties: {}
+                    };
+                    // console.log(`[TypedefDebug] Initialized typedef: ${tag.name}`, JSON.stringify(typeDefs[tag.name], null, 2));
+                }
+            }
+
+            const typedefNamesInBlock = Object.keys(typeDefs);
+
+            if (typedefNamesInBlock.length > 0) {
+                const currentTypeDefName = typedefNamesInBlock[0]; 
+                for (const tag of allTags) {
+                    if (tag.title === 'property' && tag.name && typeDefs[currentTypeDefName]) {
+                        // console.log(`[TypedefDebug] Found @property: ${tag.name} for ${currentTypeDefName}`, JSON.stringify(tag));
+                        typeDefs[currentTypeDefName].properties[tag.name] = {
+                            type: tag.type ? doctrine.type.stringify(tag.type) : 'any',
+                            description: tag.description || '',
+                            optional: !!(tag.type && tag.type.type === 'OptionalType')
+                        };
+                        // console.log(`[TypedefDebug] Added property ${tag.name} to ${currentTypeDefName}`, JSON.stringify(typeDefs[currentTypeDefName].properties[tag.name]));
+                    }
+                }
+            }
+            // console.log('[TypedefDebug] Final typeDefs for this comment block:', JSON.stringify(typeDefs, null, 2));
+            return Object.keys(typeDefs).length > 0 ? typeDefs : null;
         },
     };
 }
